@@ -9,10 +9,9 @@ function auth(req, res, next) {
   const header = req.headers["authorization"];
   const bearer = header ? header.split(" ") : [];
   const token = bearer[1] ? bearer[1] : null;
-
   // Check for token
   if (!token) {
-    res.status(401).json({ msg: "No token!!! Authorization denied" });
+    return res.status(401).json({ msg: "No token!!! Authorization denied" });
   }
 
   jwt.verify(token, "secretkey", (err, data) => {
@@ -21,7 +20,7 @@ function auth(req, res, next) {
         .status(403)
         .json({ message: "Token expired or invalidated !!" });
     } else {
-      next();
+      next(data);
     }
   });
 }

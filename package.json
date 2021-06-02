@@ -18,8 +18,8 @@
   },
   "lint-staged": {
     "*.{js,json,html,md}": [
-      "eslint --fix",
-      " prettier --write"
+      " prettier --write",
+      "eslint --fix"
     ]
   },
   "author": "Manas Dwivedi",
@@ -31,11 +31,16 @@
     "cors": "^2.8.5",
     "dotenv": "^9.0.2",
     "express": "^4.17.1",
+    "express-joi-validator": "^2.0.1",
+    "joi": "^17.4.0",
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^5.12.10",
     "nanoid": "^3.1.23",
     "nodemailer": "^6.6.0",
-    "slugify": "^1.5.3"
+    "slugify": "^1.5.3",
+    "swagger-jsdoc": "^6.1.0",
+    "swagger-ui-express": "^4.1.6",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.14.3",

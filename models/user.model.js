@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 const Schema = mongoose.Schema;
 import slugify from "slugify";
+import * as Joi from "joi";
 
 const userSchema = new Schema(
   {
@@ -16,16 +17,6 @@ const userSchema = new Schema(
       default: "null",
       ref: "users",
     },
-    // ancestors:[{
-    //     _id:{
-    //         type:mongoose.Schema.Types.ObjectId,
-    //         ref:"users",
-    //         index:true
-    //     },
-    //     name:String,
-    //     email:String,
-    //     slug:String
-    // }],
   },
   { timestamps: true }
 );
@@ -33,6 +24,19 @@ userSchema.pre("save", async function (next) {
   this.slug = slugify(this.name);
   next();
 });
+
+userSchema.methods.joiValidate = (obj) => {
+  const schema = Joi.object({
+    name: Joi.string().min(3).required(),
+    email: Joi.string().email().required(),
+    password: Joi.string().min(6).max(12).required(),
+    confirmPassword: Joi.ref("password"),
+    referralCode: Joi.string().required(),
+    parentReferralCode: Joi.string(),
+    parent: Joi.string(),
+  });
+  return schema.validate(obj);
+};
 
 const User = mongoose.model("users", userSchema);
 

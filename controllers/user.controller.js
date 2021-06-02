@@ -5,22 +5,19 @@ import mongoose from "mongoose";
 import { transport } from "../config/nodemailer.config";
 import Invite from "../models/invites.model";
 import { nanoid } from "nanoid";
+import { validateEmail } from "../helper/validate-email";
 
 export const registerUser = async (userDetails, res) => {
   try {
     const { name, email, password, confirmPassword } = userDetails;
     // Some simple validations
     if (!name || !email || !password || password !== confirmPassword) {
-      return res.status(400).json({ msg: "Please enter all fields" });
+      return res.status(400).json({ msg: "Please enter all fields correctly" });
     }
     let parent;
     // Checking for existing users
     let existingUser = await User.findOne({ email }).exec();
-    if (existingUser)
-      return res
-        .status(400)
-        .json({ msg: "User already exists", email: user.email })
-        .exec();
+    if (existingUser) return res.status(400).json({ msg: "User already exists", email: email });
     if (userDetails.parentReferralCode) {
       const parentUser = await User.findOne({
         referralCode: userDetails.parentReferralCode,
@@ -42,6 +39,13 @@ export const registerUser = async (userDetails, res) => {
       confirmPassword,
       parent,
     });
+    const userValidation = newUser.joiValidate(newUser);
+    if (userValidation.error) {
+      return res.status(400).json({
+        msg: "Validation error !! Please check the request body",
+        error: userValidation.error.details,
+      });
+    }
     // Create salt & hash
     bcrypt.genSalt(10, (err, salt) => {
       bcrypt.hash(newUser.password, salt, (err, hash) => {
@@ -82,11 +86,18 @@ export const registerUser = async (userDetails, res) => {
       .json({ message: "Internal Server Error", error: error });
   }
 };
+
 export const loginUser = async (userDetails, res) => {
   const { email, password } = userDetails;
   // Some simple validations
   if (!email || !password) {
     return res.status(400).json({ msg: "Please enter all fields" });
+  }
+  const validationResult = validateEmail({ email });
+  if (validationResult.error) {
+    return res
+      .status(400)
+      .json({ msg: "Validation Error ! Please enter email in correct format" });
   }
   // Checking for existing users
   await User.findOne({ email }).then((user) => {
@@ -95,8 +106,7 @@ export const loginUser = async (userDetails, res) => {
     bcrypt
       .compare(password, user.password)
       .then((isMatch) => {
-        if (!isMatch)
-          return res.status(400).json({ msg: "Invalid credentials" });
+        if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
         jwt.sign(
           { id: user.id, email: user.email, referralCode: user.referralCode },
           "secretkey",
@@ -116,8 +126,7 @@ export const loginUser = async (userDetails, res) => {
         );
       })
       .catch((err) => {
-        console.log(err);
-        return res.status(400).json({ msg: "User not found" });
+        return res.status(400).json({ msg: "User not found", error: err });
       });
   });
 };
@@ -170,7 +179,6 @@ export const findUserById = async (id, res) => {
         });
       });
   } catch (error) {
-    console.log(error);
     return res.status(400).json({ msg: error });
   }
 };
@@ -187,7 +195,6 @@ export const updateUser = async (id, userDetails, res) => {
       if (err) {
         return res.status(400).json({ message: "Error ! User not found" });
       }
-      console.log(response);
       return res
         .status(200)
         .json({ message: "User updated", userDetails: response });
@@ -223,22 +230,27 @@ export const deleteUser = async (id, res) => {
 };
 
 export const inviteUser = async (req, res) => {
+  if (!req.body.email) {
+    return res.status(400).json({ message: "Please enter email to invite" });
+  }
   const toEmail = req.body.email;
+  const validationResult = validateEmail({ email: toEmail });
+  if (validationResult.error) {
+    return res
+      .status(400)
+      .json({ msg: "Validation Error ! Please enter email in correct format" });
+  }
   let fromEmail, parentReferralCode;
-  console.log("inside");
   const header = req.headers["authorization"];
   const bearer = header.split(" ");
   const token = bearer[1];
   jwt.verify(token, "secretkey", (err, data) => {
     if (err) {
-      console.log(err);
+      return res.status(400).json({ message: "Failure", error: err });
     }
-    console.log("data", data);
     fromEmail = data.email;
     parentReferralCode = data.referralCode;
   });
-  console.log("From --->", fromEmail);
-  console.log("To --->", toEmail);
   if (fromEmail === toEmail) {
     return res.status(400).json({
       message: "Failure",
@@ -259,7 +271,6 @@ export const inviteUser = async (req, res) => {
   };
   transport.sendMail(mailOptions, async (error, info) => {
     if (error) {
-      console.log(error);
       return res.status(400).json({ message: "ERROR", error });
     }
     const newInvite = new Invite({
@@ -276,8 +287,7 @@ export const inviteUser = async (req, res) => {
 
 export const listDescendants = async (req, res) => {
   try {
-    if (!req.params.id)
-      return res
+    if (!req.params.id) return res
         .status(400)
         .json({ message: "Bad Request", error: "No ID found in params" });
     const response = await User.aggregate([
@@ -331,8 +341,7 @@ export const listDescendants = async (req, res) => {
 };
 
 export const getTopMostAncestor = async (req, res) => {
-  if (!req.params.id)
-    return res
+  if (!req.params.id) return res
       .status(400)
       .json({ message: "Bad Request", error: "No id found in params" });
   const userId = req.params.id;
